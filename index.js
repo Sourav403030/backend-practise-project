@@ -1,8 +1,23 @@
 require("dotenv").config();
-const connectDB = require("./src/db/db");
+const connectDB = require("./db/db");
 const express = require("express");
 const app = express();
-connectDB();
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+
+
+connectDB(); //DB connection
+
+//CORS configuration
+app.use(cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+}))
+
+app.use(express.json({limit: "16kb",}));  //Accepts JSON requests with a limit of 16kb
+app.use(express.urlencoded({extended: true, limit: "16kb"})); //Accepts URL-encoded requests with a limit of 16kb
+app.use(express.static("public")); //Serves static files from the "public" directory
+app.use(cookieParser()); //Parses cookies from incoming requests
 
 
 app.listen(process.env.PORT, ()=>{
