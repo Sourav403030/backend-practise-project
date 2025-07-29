@@ -19,6 +19,13 @@ app.use(express.urlencoded({extended: true, limit: "16kb"})); //Accepts URL-enco
 app.use(express.static("public")); //Serves static files from the "public" directory
 app.use(cookieParser()); //Parses cookies from incoming requests
 
+//routes import
+const userRouter = require("./routes/userRoutes");
+
+
+
+//routes declaration
+app.use("/api/v1/users", userRouter);
 
 app.listen(process.env.PORT, ()=>{
     console.log(`Server is running on port ${process.env.PORT}`);
