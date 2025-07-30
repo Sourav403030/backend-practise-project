@@ -200,6 +200,7 @@ const logoutUser = async(req, res) => {
 
 const refreshAccessToken = async(req, res) => {
     try {
+        //Check if the refresh token is present in cookies or request body
         const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
 
         if(!incomingRefreshToken){
@@ -209,8 +210,10 @@ const refreshAccessToken = async(req, res) => {
             });
         }
 
+        //Verify the refresh token
         const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
 
+        //Check if the user exists in the database
         const user = await userModel.findById(decodedToken?._id);
 
         if(!user){
@@ -220,6 +223,7 @@ const refreshAccessToken = async(req, res) => {
             });
         }
 
+        //Check if the refresh token matches the one in the database
         if(incomingRefreshToken !== user?.refreshToken){
             return res.status(401).json({
                 success: false,
@@ -232,8 +236,10 @@ const refreshAccessToken = async(req, res) => {
             secure: true,
         }
 
+        //Generate new access and refresh tokens
         const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id);
 
+        //Store the tokens in the cookies
         return res.status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", newRefreshToken, options)
