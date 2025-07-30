@@ -5,6 +5,7 @@ const userModel = require("../models/userModel");
 const verifyJWT = async (req, res, next) => {
     try {
         //Check if the token is present in cookies or headers
+        console.log(req.cookies);
         const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
     
         if(!token){
@@ -30,7 +31,7 @@ const verifyJWT = async (req, res, next) => {
         //Attach the user to the request object for further use
         req.user = user;
         next();
-        
+
     } catch (error) {
         return res.status(401).json({
             success: false,

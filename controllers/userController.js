@@ -1,12 +1,12 @@
 const userModel = require("../models/userModel");
 const uploadOnCloudinary = require("../utils/cloudinary");
+const jwt = require("jsonwebtoken");
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
-        
         const user = await userModel.findById(userId); // Fetch the user from the database
-        const accessToken = user.generateAccessToken(); // Generate access token using the user method
-        const refreshToken = user.generateRefreshToken(); // Generate refresh token using the user method
+        const accessToken = await user.generateAccessToken(); // Generate access token using the user method
+        const refreshToken = await user.generateRefreshToken(); // Generate refresh token using the user method
 
         user.refreshToken = refreshToken; // Set the refresh token in the user document
         await user.save({validateBeforeSave: false}); // Save the user document with the new refresh token
@@ -15,11 +15,7 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 
     } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: "Could not generate tokens",
-            error: error.message
-        })
+        throw new Error("Coult not generate tokens: " + error.message);
     }
 }
 
@@ -112,7 +108,7 @@ const loginUser = async (req, res)=>{
         const {email, username, password} = req.body; // Get the email, username, and password from the request body
 
         //Check if the email or username is provided
-        if(!username || !email){
+        if(!(username || email)){
             return res.status(400).json({
                 success: false,
                 message: "Username or email are required"
@@ -140,6 +136,14 @@ const loginUser = async (req, res)=>{
         //Generate access and refresh tokens
         const {accessToken, refreshToken} = await generateAccessAndRefreshTokens(user._id); 
 
+        if(!accessToken || !refreshToken){
+            return res.status(500).json({
+                success: false,
+                message: "No tokens found",
+            });
+        }
+        
+
         //Fetch the user without password and refresh token
         const loggedInUser = await userModel.findById(user._id).select("-password -refreshToken");
 
@@ -157,6 +161,7 @@ const loginUser = async (req, res)=>{
             success: true,
             message: "User logged in successfully",
             user: loggedInUser, accessToken, refreshToken
+            
         })
          
     } catch (error) {
@@ -193,4 +198,60 @@ const logoutUser = async(req, res) => {
     }
 }
 
-module.exports = {registerUser, loginUser, logoutUser};
+const refreshAccessToken = async(req, res) => {
+    try {
+        const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+        if(!incomingRefreshToken){
+            return res.status(401).json({
+                success: false,
+                message: "Refresh token is required"
+            });
+        }
+
+        const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+        const user = await userModel.findById(decodedToken?._id);
+
+        if(!user){
+            return res.status(404).json({
+                success: false,
+                message: "Invalid refresh token"
+            });
+        }
+
+        if(incomingRefreshToken !== user?.refreshToken){
+            return res.status(401).json({
+                success: false,
+                message: "Refresh token does not match"
+            });
+        }
+
+        const options = {
+            httpOnly: true,
+            secure: true,
+        }
+
+        const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id);
+
+        return res.status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", newRefreshToken, options)
+        .json({
+            success: true,
+            message: "Access token refreshed successfully",
+            accessToken,
+            newRefreshToken
+        })
+
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Could not refresh access token",
+            error: error.message
+        })
+    }
+}
+
+module.exports = {registerUser, loginUser, logoutUser, refreshAccessToken};
